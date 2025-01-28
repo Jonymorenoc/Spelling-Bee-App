@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Spelling Bee</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .game-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .input-letter {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            margin: 8px;
+            border: none;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: bold;
+            background: #f0f2f5;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .correct {
+            background: #4CAF50 !important;
+            color: white;
+        }
+
+        .present {
+            background: #FFC107 !important;
+            color: white;
+        }
+
+        .absent {
+            background: #F44336 !important;
+            color: white;
+        }
+
+        #emoji-display {
+            font-size: 100px;
+            margin: 2rem 0;
+            text-align: center;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+            font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+        }
+
+        #next-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: none;
+            margin-top: 2rem;
+            text-align: center;
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #next-btn:hover {
+            transform: translate(-50%, -2px);
+        }
+
+        .word-counter {
+            color: #666;
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .correct-word-animation {
+            animation: pop 0.5s ease-in-out;
+        }
+
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="word-counter" id="word-number">WORD #01</div>
+        <div id="emoji-display">🧶</div>
+        <div id="word-container" style="display: flex; justify-content: center;"></div>
+        <button id="next-btn" onclick="loadNewWord()">Next Word →</button>
+    </div>
+    <canvas class="confetti" id="confetti-canvas"></canvas>
+
+    <script>
+        const words = [
+            'yarn', 'year', 'cherry', 'mirror', 'parrot', 'arrow',
+            'small', 'chain', 'nail', 'robe', 'toad', 'train',
+            'clown', 'sound', 'seal', 'sheep', 'cow', 'feet',
+            'weather', 'cloth', 'thief', 'think', 'fifth', 'month'
+        ];
+
+        const wordEmojis = {
+            'yarn': '🧶', 'year': '📅', 'cherry': '🍒', 'mirror': '🪞',
+            'parrot': '🦜', 'arrow': '🏹', 'small': '🐭', 'chain': '⛓️',
+            'nail': '📌', 'robe': '👘', 'toad': '🐸', 'train': '🚂',
+            'clown': '🤡', 'sound': '🔊', 'seal': '🦭', 'sheep': '🐑',
+            'cow': '🐄', 'feet': '🦶', 'weather': '🌤️', 'cloth': '🧵',
+            'thief': '🎭', 'think': '🤔', 'fifth': '5️⃣', 'month': '📅'
+        };
+
+        let usedIndices = [];
+        let currentWord = '';
+        let confettiInterval;
+
+        function initializeGame() {
+            if (words.length === usedIndices.length) {
+                alert('🎉 All words completed! Well done!');
+                return;
+            }
+            
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * words.length);
+            } while (usedIndices.includes(randomIndex));
+            
+            usedIndices.push(randomIndex);
+            currentWord = words[randomIndex];
+            
+            document.getElementById('word-number').textContent = 
+                `WORD #${(randomIndex + 1).toString().padStart(2, '0')}`;
+            
+            document.getElementById('emoji-display').textContent = 
+                wordEmojis[currentWord];
+            
+            resetConfetti();
+            createInputBoxes(currentWord);
+        }
+
+        function createInputBoxes(word) {
+            const container = document.getElementById('word-container');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < word.length; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.maxLength = 1;
+                input.className = 'input-letter';
+                
+                input.addEventListener('input', (e) => {
+                    const userLetter = e.target.value.toLowerCase();
+                    validateLetters(word, userLetter, i);
+                    checkCompletion(word);
+
+                    // Move to next input
+                    if (e.target.value.length > 0) {
+                        const nextInput = container.children[i + 1];
+                        if (nextInput) nextInput.focus();
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace') {
+                        const prevInput = container.children[i - 1];
+                        e.target.value = '';
+                        if (prevInput) prevInput.focus();
+                    }
+                });
+
+                container.appendChild(input);
+            }
+        }
+
+        function validateLetters(targetWord, userLetter, position) {
+            const inputs = document.querySelectorAll('.input-letter');
+            const targetLetters = targetWord.split('');
+            const userLetters = Array.from(inputs).map(input => input.value.toLowerCase());
+            
+            // Reset all styles first
+            inputs.forEach(input => {
+                input.classList.remove('correct', 'present', 'absent');
+            });
+
+            // First pass for correct letters
+            userLetters.forEach((letter, index) => {
+                if (letter === targetLetters[index]) {
+                    inputs[index].classList.add('correct');
+                    targetLetters[index] = null; // Mark as used
+                }
+            });
+
+            // Second pass for present letters
+            userLetters.forEach((letter, index) => {
+                if (!letter || inputs[index].classList.contains('correct')) return;
+                
+                const targetIndex = targetLetters.indexOf(letter);
+                if (targetIndex > -1) {
+                    inputs[index].classList.add('present');
+                    targetLetters[targetIndex] = null; // Mark as used
+                } else {
+                    inputs[index].classList.add('absent');
+                }
+            });
+        }
+
+        function checkCompletion(word) {
+            const inputs = document.querySelectorAll('.input-letter');
+            const userWord = Array.from(inputs).map(input => input.value.toLowerCase()).join('');
+            if (userWord === word.toLowerCase()) {
+                document.getElementById('emoji-display').classList.add('correct-word-animation');
+                document.getElementById('next-btn').style.display = 'block';
+                launchConfetti();
+            } else {
+                document.getElementById('emoji-display').classList.remove('correct-word-animation');
+            }
+        }
+
+        function loadNewWord() {
+            document.getElementById('next-btn').style.display = 'none';
+            initializeGame();
+        }
+
+        function launchConfetti() {
+            const confetti = document.getElementById('confetti-canvas');
+            const context = confetti.getContext('2d');
+            confetti.width = window.innerWidth;
+            confetti.height = window.innerHeight;
+
+            const confettiParticles = [];
+            for (let i = 0; i < 100; i++) {
+                confettiParticles.push({
+                    x: Math.random() * confetti.width,
+                    y: Math.random() * confetti.height - confetti.height,
+                    size: Math.random() * 7 + 3,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    speed: Math.random() * 3 + 2,
+                });
+            }
+
+            function drawConfetti() {
+                context.clearRect(0, 0, confetti.width, confetti.height);
+                confettiParticles.forEach((particle, index) => {
+                    context.fillStyle = particle.color;
+                    context.beginPath();
+                    context.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
+                    context.fill();
+                    particle.y += particle.speed;
+                    if (particle.y > confetti.height) {
+                        confettiParticles[index] = {
+                            x: Math.random() * confetti.width,
+                            y: Math.random() * confetti.height - confetti.height,
+                            size: Math.random() * 7 + 3,
+                            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                            speed: Math.random() * 3 + 2,
+                        };
+                    }
+                });
+            }
+
+            if (!confettiInterval) {
+                confettiInterval = setInterval(() => {
+                    drawConfetti();
+                }, 1000 / 60);
+            }
+        }
+
+        function resetConfetti() {
+            const confetti = document.getElementById('confetti-canvas');
+            const context = confetti.getContext('2d');
+            context.clearRect(0, 0, confetti.width, confetti.height);
+            if (confettiInterval) {
+                clearInterval(confettiInterval);
+                confettiInterval = null;
+            }
+        }
+
+        initializeGame();
+    </script>
+</body>
+</html>
